@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Nana Lashes | Admin</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { margin:0; background:#faf5f2; color:#443735; font-family:Arial,sans-serif; }
+    header { background:white; padding:24px 18px; text-align:center; border-bottom:1px solid #ebdfd9; }
+    h1 { font-family:Georgia,serif; font-weight:normal; margin:0 0 7px; letter-spacing:2px; }
+    .sub { color:#997f7c; font-size:13px; }
+    main { max-width:780px; margin:30px auto; padding:0 16px 40px; }
+    .card { background:white; border-radius:14px; padding:22px; margin-bottom:18px; box-shadow:0 5px 25px #5a34340c; }
+    h2 { font:normal 24px Georgia,serif; margin:0 0 18px; }
+    label { display:block; margin:12px 0 6px; font-size:14px; }
+    input { width:100%; padding:12px; border:1px solid #e6d4cf; border-radius:8px; font:inherit; }
+    button { padding:11px 16px; border:0; border-radius:8px; cursor:pointer; background:#b78d8c; color:white; font:inherit; }
+    button:disabled { opacity:.55; cursor:wait; }
+    button.secondary { background:#eee3df; color:#443735; }
+    button.danger { background:#a85454; }
+    .row { display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap; }
+    .form-row { display:grid; grid-template-columns:1fr 1fr auto; gap:12px; align-items:end; }
+    .form-row label { margin:0; }
+    .form-row input { margin-top:7px; }
+    .item { border-top:1px solid #f0e5e1; padding:13px 0; display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap; }
+    .item div { overflow-wrap:anywhere; }
+    .muted { color:#89736e; font-size:13px; margin-top:5px; }
+    .status { min-height:22px; color:#745c58; font-size:14px; margin:12px 0 0; }
+    .hidden { display:none; }
+    @media(max-width:600px) { .form-row { grid-template-columns:1fr; } .card { padding:17px; } }
+  </style>
+</head>
+<body>
+<header><h1>NANA LASHES</h1><div class="sub">PRIVATE ADMIN DASHBOARD</div></header>
+<main>
+  <section id="loginSection" class="card">
+    <h2>Admin Sign In</h2>
+    <form id="loginForm">
+      <label for="email">Email</label>
+      <input id="email" type="email" autocomplete="username" required>
+      <label for="password">Password</label>
+      <input id="password" type="password" autocomplete="current-password" required>
+      <p><button id="loginButton" type="submit">Sign In</button></p>
+    </form>
+    <p class="status" id="loginStatus" role="status"></p>
+  </section>
+  <div id="dashboard" class="hidden">
+    <section class="card row">
+      <div><strong id="accountEmail"></strong><div id="accountRole" class="muted"></div></div>
+      <button class="secondary" id="logoutButton">Sign Out</button>
+    </section>
+    <section class="card">
+      <h2>Add Available Time</h2>
+      <form id="slotForm" class="form-row">
+        <label>Date <input id="newDate" type="date" required></label>
+        <label>Time <input id="newTime" type="time" required></label>
+        <button id="addButton" type="submit">Add Slot</button>
+      </form>
+      <p id="slotStatus" class="status" role="status"></p>
+    </section>
+    <section class="card">
+      <div class="row"><h2>Customer Bookings</h2><button class="secondary" id="refreshButton">Refresh</button></div>
+      <div id="bookingsList"></div>
+    </section>
+    <section class="card">
+      <h2>Available / Booked Slots</h2>
+      <div id="slotsList"></div>
+    </section>
+    <p class="muted">All dates and times refer to Toronto local time. Cancel a booking before deleting its slot.</p>
+  </div>
+</main>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+  // Enter the same publishable credentials used in index.html.
+  const SUPABASE_URL = "YOUR_PROJECT_URL";
+  const SUPABASE_KEY = "YOUR_PUBLISHABLE_KEY";
+  const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+  const el = id => document.getElementById(id);
+  const status = (id, message) => { el(id).textContent = message; };
+  const readableTime = time => {
+    const [h, m] = time.split(':').map(Number);
+    return `${h % 12 || 12}:${String(m).padStart(2,'0')} ${h >= 12 ? 'PM':'AM'}`;
+  };
+  const torontoToday = () => {
+    const parts = new Intl.DateTimeFormat('en-US', {timeZone:'America/Toronto', year:'numeric', month:'2-digit', day:'2-digit'}).formatToParts(new Date());
+    const part = name => parts.find(p => p.type === name).value;
+    return `${part('year')}-${part('month')}-${part('day')}`;
+  };
+  const make = (tag, value, className) => {
+    const node = document.createElement(tag);
+    if (value !== undefined) node.textContent = value;
+    if (className) node.className = className;
+    return node;
+  };
+
+  async function checkAccount() {
+    const {data:{user}, error} = await db.auth.getUser();
+    if (error || !user) { showLogin(); return; }
+    const result = await db.from('admin_users').select('role').eq('user_id', user.id).maybeSingle();
+    if (result.error || !result.data) {
+      await db.auth.signOut();
+      showLogin();
+      status('loginStatus', 'This account does not have admin access.');
+      return;
+    }
+    el('loginSection').classList.add('hidden');
+    el('dashboard').classList.remove('hidden');
+    el('accountEmail').textContent = user.email;
+    el('accountRole').textContent = result.data.role === 'owner' ? 'Owner' : 'Admin';
+    await refresh();
+  }
+  function showLogin() {
+    el('dashboard').classList.add('hidden');
+    el('loginSection').classList.remove('hidden');
+  }
+
+  el('loginForm').addEventListener('submit', async event => {
+    event.preventDefault();
+    el('loginButton').disabled = true;
+    status('loginStatus', 'Signing in...');
+    const {error} = await db.auth.signInWithPassword({
+      email:el('email').value.trim(), password:el('password').value
+    });
+    el('loginButton').disabled = false;
+    el('password').value = '';
+    if (error) { status('loginStatus', error.message); return; }
+    status('loginStatus', '');
+    await checkAccount();
+  });
+  el('logoutButton').addEventListener('click', async () => {
+    await db.auth.signOut();
+    showLogin();
+  });
+
+  el('slotForm').addEventListener('submit', async event => {
+    event.preventDefault();
+    const date = el('newDate').value;
+    if (date < torontoToday()) { status('slotStatus', 'Choose today or a future date.'); return; }
+    el('addButton').disabled = true;
+    const {error} = await db.from('slots').insert({slot_date:date, slot_time:el('newTime').value});
+    el('addButton').disabled = false;
+    status('slotStatus', error ? error.message : 'Available time added.');
+    if (!error) { el('slotForm').reset(); await refresh(); }
+  });
+
+  async function refresh() {
+    const bookingsList = el('bookingsList');
+    const slotsList = el('slotsList');
+    bookingsList.textContent = 'Loading bookings...';
+    slotsList.textContent = 'Loading slots...';
+    const [bookingsRes, slotsRes] = await Promise.all([
+      db.from('bookings').select('id,slot_id,customer_name,customer_phone,slots(slot_date,slot_time)'),
+      db.from('slots').select('id,slot_date,slot_time').gte('slot_date',torontoToday()).order('slot_date').order('slot_time')
+    ]);
+    if (bookingsRes.error) {
+      bookingsList.textContent = 'Error: ' + bookingsRes.error.message;
+    } else {
+      bookingsList.replaceChildren();
+      const bookings = bookingsRes.data.sort((a,b) =>
+        `${a.slots?.slot_date || ''} ${a.slots?.slot_time || ''}`.localeCompare(`${b.slots?.slot_date || ''} ${b.slots?.slot_time || ''}`));
+      if (!bookings.length) bookingsList.textContent = 'No bookings yet.';
+      bookings.forEach(booking => {
+        const item = make('div', undefined, 'item');
+        const details = make('div');
+        details.append(make('strong', `${booking.slots?.slot_date || 'Unknown date'} · ${booking.slots ? readableTime(booking.slots.slot_time) : 'Unknown time'}`));
+        details.append(make('div', `${booking.customer_name} · ${booking.customer_phone}`, 'muted'));
+        const cancel = make('button','Cancel Booking','danger');
+        cancel.onclick = async () => {
+          if (!confirm(`Cancel booking for ${booking.customer_name}? The slot will become available again.`)) return;
+          cancel.disabled = true;
+          const {error} = await db.from('bookings').delete().eq('id',booking.id);
+          if (error) alert(error.message);
+          await refresh();
+        };
+        item.append(details,cancel); bookingsList.append(item);
+      });
+    }
+    if (slotsRes.error) {
+      slotsList.textContent = 'Error: ' + slotsRes.error.message;
+      return;
+    }
+    slotsList.replaceChildren();
+    if (!slotsRes.data.length) slotsList.textContent = 'No upcoming slots.';
+    const bookedIds = new Set((bookingsRes.data || []).map(b => b.slot_id));
+    slotsRes.data.forEach(slot => {
+      const item = make('div', undefined, 'item');
+      const booked = bookedIds.has(slot.id);
+      item.append(make('div', `${slot.slot_date} · ${readableTime(slot.slot_time)} — ${booked ? 'Booked' : 'Available'}`));
+      if (!booked && !bookingsRes.error) {
+        const remove = make('button','Delete Slot','secondary');
+        remove.onclick = async () => {
+          if (!confirm(`Delete ${slot.slot_date} at ${readableTime(slot.slot_time)}?`)) return;
+          remove.disabled = true;
+          const {error} = await db.from('slots').delete().eq('id',slot.id);
+          if (error) alert(error.message);
+          await refresh();
+        };
+        item.append(remove);
+      }
+      slotsList.append(item);
+    });
+  }
+  el('refreshButton').addEventListener('click', refresh);
+  el('newDate').min = torontoToday();
+  checkAccount();
+</script>
+</body>
+</html>
