@@ -139,48 +139,127 @@
 
   <footer>© Nana Lashes · Made with love ♡</footer>
 
+ 
   <script>
-    const times = ["10:00 AM", "12:00 PM", "2:00 PM",
-                   "4:00 PM", "6:00 PM"];
-    const slots = document.getElementById("slots");
-    const date = document.getElementById("date");
+    // STEP 1: Add your Supabase connection details
+    const SUPABASE_URL = "https://xwokxjyjkrjhouwhzmmz.supabase.co";
+    const SUPABASE_KEY = "sb_publishable_BCdj-ZlHyxGVVKqlCaw71A_j02OECtV";
+  
+    const dateInput = document.getElementById("date");
+    const slotsBox = document.getElementById("slots");
     const message = document.getElementById("message");
-    let selectedTime = "";
-
-    const today = new Date();
-    const localDate = new Date(
-      today.getTime() - today.getTimezoneOffset() * 60000
-    ).toISOString().split("T")[0];
-
-    date.min = localDate;
-    date.value = localDate;
-
-    times.forEach(time => {
-      const button = document.createElement("button");
-      button.className = "slot";
-      button.textContent = time;
-      button.type = "button";
-      button.onclick = () => {
-        selectedTime = time;
-        document.querySelectorAll(".slot").forEach(b =>
-          b.classList.remove("selected")
+    const form = document.getElementById("bookingForm");
+  
+    let allSlots = [];
+    let selectedSlot = null;
+  
+    // Today's date in Toronto
+    const today = new Intl.DateTimeFormat("en-CA", {
+      timeZone: "America/Toronto",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit"
+    }).format(new Date());
+  
+    dateInput.min = today;
+    dateInput.value = today;
+  
+    // Convert 21:30:00 to 9:30 PM
+    function formatTime(time) {
+      const [hours, minutes] = time.split(":").map(Number);
+      const period = hours >= 12 ? "PM" : "AM";
+      const hour = hours % 12 || 12;
+  
+      return `${hour}:${String(minutes).padStart(2, "0")} ${period}`;
+    }
+  
+    // Load appointment slots from Supabase
+    async function loadSlots() {
+      slotsBox.textContent = "Loading appointments...";
+  
+      try {
+        const response = await fetch(
+          `${SUPABASE_URL}/rest/v1/slots` +
+          `?select=id,slot_date,slot_time` +
+          `&slot_date=gte.${today}` +
+          `&order=slot_date.asc,slot_time.asc`,
+          {
+            headers: {
+              "apikey": SUPABASE_KEY
+            }
+          }
         );
-        button.classList.add("selected");
-      };
-      slots.appendChild(button);
-    });
-
-    document.getElementById("bookingForm")
-      .addEventListener("submit", event => {
-        event.preventDefault();
-        if (!selectedTime) {
-          message.textContent = "Please select a time.";
-          return;
+  
+        if (!response.ok) {
+          throw new Error(`Supabase error: ${response.status}`);
         }
-        message.textContent =
-          "Preview: " + date.value + " at " + selectedTime +
-          ". This is not a confirmed booking yet.";
+  
+        allSlots = await response.json();
+        showSlots();
+      } catch (error) {
+        console.error(error);
+        slotsBox.textContent = "Unable to load appointments.";
+        message.textContent = "Please try again later.";
+      }
+    }
+  
+    // Display slots for selected date
+    function showSlots() {
+      slotsBox.replaceChildren();
+      selectedSlot = null;
+  
+      const available = allSlots.filter(
+        slot => slot.slot_date === dateInput.value
+      );
+  
+      if (available.length === 0) {
+        slotsBox.textContent = "No available times for this date.";
+        return;
+      }
+  
+      available.forEach(slot => {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "slot";
+        button.textContent = formatTime(slot.slot_time);
+  
+        button.addEventListener("click", () => {
+          selectedSlot = slot;
+  
+          document.querySelectorAll(".slot").forEach(b => {
+            b.classList.remove("selected");
+          });
+  
+          button.classList.add("selected");
+          message.textContent =
+            "Selected: " + formatTime(slot.slot_time);
+        });
+  
+        slotsBox.appendChild(button);
       });
+    }
+  
+    // Update the available times when date changes
+    dateInput.addEventListener("change", showSlots);
+  
+    // Booking confirmation will be added in Step 6
+    form.addEventListener("submit", event => {
+      event.preventDefault();
+  
+      if (!selectedSlot) {
+        message.textContent = "Please choose an appointment time.";
+        return;
+      }
+  
+      message.textContent =
+        "Appointment preview: " +
+        selectedSlot.slot_date + " at " +
+        formatTime(selectedSlot.slot_time) +
+        ". Booking is not confirmed yet.";
+    });
+  
+    loadSlots();
   </script>
+
 </body>
 </html>
