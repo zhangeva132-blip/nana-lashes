@@ -1,0 +1,186 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Nana Lashes | Book Online</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: #faf5f2;
+      color: #443735;
+      font-family: Arial, sans-serif;
+    }
+    header {
+      background: #fff;
+      padding: 24px;
+      text-align: center;
+      border-bottom: 1px solid #ebdfd9;
+    }
+    .logo {
+      font-family: Georgia, serif;
+      font-size: 32px;
+      letter-spacing: 3px;
+    }
+    .subtitle {
+      font-size: 12px;
+      letter-spacing: 3px;
+      color: #ad8786;
+    }
+    main {
+      max-width: 520px;
+      margin: 55px auto;
+      padding: 0 20px;
+    }
+    h1 {
+      font-family: Georgia, serif;
+      font-weight: normal;
+      font-size: 34px;
+      text-align: center;
+    }
+    .intro {
+      color: #917b75;
+      text-align: center;
+      margin-bottom: 35px;
+    }
+    .card {
+      background: white;
+      padding: 28px;
+      border-radius: 16px;
+      box-shadow: 0 8px 35px #5a34340c;
+    }
+    h3 { font-size: 15px; margin: 12px 0 16px; }
+    .slots {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+      margin-bottom: 24px;
+    }
+    button, input, select {
+      font: inherit;
+      padding: 13px;
+      border-radius: 8px;
+    }
+    .slot {
+      background: #fff;
+      border: 1px solid #e6d4cf;
+      cursor: pointer;
+    }
+    .slot.selected {
+      background: #b78d8c;
+      color: white;
+      border-color: #b78d8c;
+    }
+    input, select {
+      width: 100%;
+      border: 1px solid #e6d4cf;
+      margin-bottom: 12px;
+      background: white;
+    }
+    label { display: block; margin-bottom: 8px; }
+    .primary {
+      width: 100%;
+      border: none;
+      background: #b78d8c;
+      color: white;
+      cursor: pointer;
+      margin-top: 12px;
+    }
+    .notice {
+      font-size: 13px;
+      color: #927a73;
+      text-align: center;
+      line-height: 1.6;
+    }
+    footer {
+      text-align: center;
+      padding: 35px;
+      color: #a38b84;
+      font-size: 13px;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="logo">NANA LASHES</div>
+    <div class="subtitle">LASH STUDIO</div>
+  </header>
+
+  <main>
+    <h1>Book Your Appointment</h1>
+    <p class="intro">Your perfect lashes are just a click away.</p>
+
+    <div class="card">
+      <h3>1. Choose a date</h3>
+      <input type="date" id="date">
+
+      <h3>2. Choose a time</h3>
+      <div class="slots" id="slots"></div>
+
+      <h3>3. Your information</h3>
+      <form id="bookingForm">
+        <label for="name">Full name</label>
+        <input id="name" required placeholder="Your name">
+
+        <label for="phone">Phone number</label>
+        <input id="phone" type="tel" required placeholder="Your phone number">
+
+        <button class="primary" type="submit">
+          Preview Appointment
+        </button>
+      </form>
+      <p class="notice" id="message">
+        Demo only. Online booking is not connected yet.
+      </p>
+    </div>
+  </main>
+
+  <footer>© Nana Lashes · Made with love ♡</footer>
+
+  <script>
+    const times = ["10:00 AM", "12:00 PM", "2:00 PM",
+                   "4:00 PM", "6:00 PM"];
+    const slots = document.getElementById("slots");
+    const date = document.getElementById("date");
+    const message = document.getElementById("message");
+    let selectedTime = "";
+
+    const today = new Date();
+    const localDate = new Date(
+      today.getTime() - today.getTimezoneOffset() * 60000
+    ).toISOString().split("T")[0];
+
+    date.min = localDate;
+    date.value = localDate;
+
+    times.forEach(time => {
+      const button = document.createElement("button");
+      button.className = "slot";
+      button.textContent = time;
+      button.type = "button";
+      button.onclick = () => {
+        selectedTime = time;
+        document.querySelectorAll(".slot").forEach(b =>
+          b.classList.remove("selected")
+        );
+        button.classList.add("selected");
+      };
+      slots.appendChild(button);
+    });
+
+    document.getElementById("bookingForm")
+      .addEventListener("submit", event => {
+        event.preventDefault();
+        if (!selectedTime) {
+          message.textContent = "Please select a time.";
+          return;
+        }
+        message.textContent =
+          "Preview: " + date.value + " at " + selectedTime +
+          ". This is not a confirmed booking yet.";
+      });
+  </script>
+</body>
+</html>
