@@ -58,7 +58,7 @@
       gap: 10px;
       margin-bottom: 24px;
     }
-    button, input, select {
+    button, input, select, textarea {
       font: inherit;
       padding: 13px;
       border-radius: 8px;
@@ -73,7 +73,7 @@
       color: white;
       border-color: #b78d8c;
     }
-    input, select {
+    input, select, textarea {
       width: 100%;
       border: 1px solid #e6d4cf;
       margin-bottom: 12px;
@@ -99,6 +99,52 @@
       padding: 35px;
       color: #a38b84;
       font-size: 13px;
+    }
+    #bookingDialog {
+      width: min(420px, calc(100% - 32px));
+      border: none;
+      border-radius: 16px;
+      padding: 28px;
+      background: white;
+      color: #443735;
+      box-shadow: 0 12px 45px #0003;
+      line-height: 1.6;
+    }
+    
+    #bookingDialog::backdrop {
+      background: rgba(0, 0, 0, 0.48);
+    }
+    
+    #bookingDialog h2 {
+      font-family: Georgia, serif;
+      font-weight: normal;
+      margin-top: 0;
+    }
+    
+    .dialog-buttons {
+      display: flex;
+      gap: 10px;
+      margin-top: 24px;
+    }
+    
+    .dialog-buttons button {
+      flex: 1;
+      cursor: pointer;
+      border: 1px solid #b78d8c;
+    }
+    
+    #backButton {
+      background: white;
+      color: #443735;
+    }
+    
+    #confirmButton {
+      background: #b78d8c;
+      color: white;
+    }
+    
+    #confirmButton:disabled {
+      opacity: 0.5;
     }
   </style>
 </head>
@@ -127,16 +173,49 @@
         <label for="phone">Phone number</label>
         <input id="phone" type="tel" required placeholder="Your phone number">
 
+        <label for="notes">Additional Notes (Optional)</label>
+        <textarea
+          id="notes"
+          maxlength="500"
+          rows="4"
+          placeholder="Any allergies, sensitivities, or special requests?"
+        ></textarea>
+
         <button class="primary" type="submit">
           Preview Appointment
         </button>
       </form>
       <p class="notice" id="message">
-        Demo only. Online booking is not connected yet.
+        Select an available appointment to continue.
       </p>
     </div>
   </main>
-
+  
+  <dialog id="bookingDialog" aria-labelledby="dialogTitle">
+    <h2 id="dialogTitle">Before You Book</h2>
+  
+    <p>
+      Please let us know in advance if you have sensitive
+      eyes, allergies, eye infections, or have experienced
+      reactions to lash products before.
+    </p>
+  
+    <p>
+      Your comfort and safety are important to us.
+      We may need to adjust or reschedule your appointment.
+    </p>
+  
+    <div class="dialog-buttons">
+      <button type="button" id="backButton">
+        Go Back
+      </button>
+  
+      <button type="button" id="confirmButton">
+        Confirm Booking
+      </button>
+    </div>
+  </dialog>
+  
   <footer>© Nana Lashes · Made with love ♡</footer>
 
  
@@ -255,57 +334,97 @@
       loadSlots();
     });
   
-    // Submit a real customer booking
-    form.addEventListener("submit", async event => {
-      event.preventDefault();
   
+    // Booking confirmation popup
+    const bookingDialog = document.getElementById("bookingDialog");
+    const backButton = document.getElementById("backButton");
+    const confirmButton = document.getElementById("confirmButton");
+
+    let pendingSlot = null;
+    let bookingInProgress = false;
+
+    // Show popup before booking
+    form.addEventListener("submit", event => {
+      event.preventDefault();
+
       if (!selectedSlot) {
         message.textContent = "Please choose an appointment time.";
         return;
       }
-  
-      const slot = selectedSlot;
+
+      pendingSlot = selectedSlot;
+      bookingDialog.showModal();
+    });
+
+    // Return without booking
+    backButton.addEventListener("click", () => {
+      bookingDialog.close();
+    });
+
+    // Clear pending selection when popup closes
+    bookingDialog.addEventListener("close", () => {
+      if (!bookingInProgress) {
+        pendingSlot = null;
+      }
+    });
+
+    // Confirm and submit the real booking
+    confirmButton.addEventListener("click", async () => {
+      if (!pendingSlot || bookingInProgress) return;
+
+      const slot = pendingSlot;
       const name = document.getElementById("name").value.trim();
       const phone = document.getElementById("phone").value.trim();
-  
-      submitButton.disabled = true;
-      submitButton.textContent = "Booking...";
-  
+      const notes = document.getElementById("notes").value.trim();
+
+      bookingInProgress = true;
+      confirmButton.disabled = true;
+      confirmButton.textContent = "Booking...";
+      backButton.disabled = true;
+
       try {
         const success = await callSupabase(
           "book_appointment",
           {
             p_slot_id: slot.id,
             p_name: name,
-            p_phone: phone
+            p_phone: phone,
+            p_notes: notes
           }
         );
-  
+
+        bookingDialog.close();
+
         if (success === true) {
           form.reset();
-  
+
           message.textContent =
             "Booking Confirmed! " +
-            slot.slot_date + " at " + formatTime(slot.slot_time) +
+            slot.slot_date + " at " +
+            formatTime(slot.slot_time) +
             ". Thank you for booking with Nana Lashes!";
-  
-          await loadSlots();
         } else {
           message.textContent =
             "This time is no longer available, or your information is invalid. Please try again.";
-          await loadSlots();
         }
+
+        await loadSlots();
       } catch (error) {
         console.error(error);
+        bookingDialog.close();
+
         message.textContent =
           "Could not confirm your booking. Please contact Nana Lashes before trying again.";
       } finally {
-        submitButton.disabled = false;
-        submitButton.textContent = "Confirm Booking";
+        pendingSlot = null;
+        bookingInProgress = false;
+        confirmButton.disabled = false;
+        confirmButton.textContent = "Confirm Booking";
+        backButton.disabled = false;
       }
     });
   
-    submitButton.textContent = "Confirm Booking";
+    submitButton.textContent = "Continue to Booking";
   
     loadSlots();
   </script>
