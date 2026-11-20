@@ -14,13 +14,13 @@
     .card { background:white; border-radius:14px; padding:22px; margin-bottom:18px; box-shadow:0 5px 25px #5a34340c; }
     h2 { font:normal 24px Georgia,serif; margin:0 0 18px; }
     label { display:block; margin:12px 0 6px; font-size:14px; }
-    input { width:100%; padding:12px; border:1px solid #e6d4cf; border-radius:8px; font:inherit; }
+    input, select { width:100%; padding:12px; border:1px solid #e6d4cf; border-radius:8px; font:inherit; }
     button { padding:11px 16px; border:0; border-radius:8px; cursor:pointer; background:#b78d8c; color:white; font:inherit; }
     button:disabled { opacity:.55; cursor:wait; }
     button.secondary { background:#eee3df; color:#443735; }
     button.danger { background:#a85454; }
     .row { display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap; }
-    .form-row { display:grid; grid-template-columns:1fr 1fr auto; gap:12px; align-items:end; }
+    .form-row { display:grid; grid-template-columns:1fr 1fr 1fr auto; gap:12px; align-items:end; }
     .form-row label { margin:0; }
     .form-row input { margin-top:7px; }
     .item { border-top:1px solid #f0e5e1; padding:13px 0; display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap; }
@@ -54,7 +54,32 @@
       <h2>Add Available Time</h2>
       <form id="slotForm" class="form-row">
         <label>Date <input id="newDate" type="date" required></label>
-        <label>Time <input id="newTime" type="time" required></label>
+        <label>Hour
+          <select id="newHour" required>
+            <option value="07">7 AM</option>
+            <option value="08">8 AM</option>
+            <option value="09">9 AM</option>
+            <option value="10">10 AM</option>
+            <option value="11">11 AM</option>
+            <option value="12">12 PM</option>
+            <option value="13">1 PM</option>
+            <option value="14">2 PM</option>
+            <option value="15">3 PM</option>
+            <option value="16">4 PM</option>
+            <option value="20">8 PM</option>
+            <option value="21">9 PM</option>
+            <option value="22">10 PM</option>
+            <option value="23">11 PM</option>
+            <option value="00">12 AM</option>
+          </select>
+        </label>
+        <label>Minute
+          <select id="newMinute" required>
+            <option value="00">00</option>
+            <option value="30">30</option>
+          </select>
+        </label>
+
         <button id="addButton" type="submit">Add Slot</button>
       </form>
       <p id="slotStatus" class="status" role="status"></p>
@@ -138,7 +163,11 @@
     const date = el('newDate').value;
     if (date < torontoToday()) { status('slotStatus', 'Choose today or a future date.'); return; }
     el('addButton').disabled = true;
-    const {error} = await db.from('slots').insert({slot_date:date, slot_time:el('newTime').value});
+    const time = `${el('newHour').value}:${el('newMinute').value}`;
+    const {error} = await db.from('slots').insert({
+      slot_date: date,
+      slot_time: time
+    });
     el('addButton').disabled = false;
     status('slotStatus', error ? error.message : 'Available time added.');
     if (!error) { el('slotForm').reset(); await refresh(); }
